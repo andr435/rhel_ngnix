@@ -12,12 +12,12 @@ If not, prompt for a virtual-host name and configure it.
 
 * Verify dependencies for:
 
-    *User directories (userdir)
+    * User directories (userdir)
 
-    *Authentication (auth)
+    * Authentication (auth)
 
-    *CGI scripting (cgi)
+    * CGI scripting (cgi)
 
-    *Install them if missing.
+    * Install them if missing.
 
 * Provide an argument-based system to install and configure each of the options above.

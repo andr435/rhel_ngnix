@@ -22,12 +22,12 @@ Update_system()
 		return 0
 	fi
 	
-	update_run=True
 	echo System update
 
 	set +o errexit
 	yum check-update; yum update -yv
 	set -o errexit
+    update_run=True
 }
 
 
@@ -72,13 +72,27 @@ Run_all(){
 
 
 #############################################################################
-# Install_ngnix
+# Install_nginx
 #############################################################################
 Install_nginx(){
-    # check if nginx installed if not
-    Update_system
-    # install nginx
+    # check if nginx and needed modules is installed
+    n_modules=(nginx)
 
+    #looping through the elements to print 
+    for item in ${n_modules[@]}
+        do
+            # Update_system
+            if rpm -q $item | grep 'is not installed'; then
+                echo installing $item
+             #   yum -y install $item
+            else
+                echo $item already installed
+            fi
+        done
+    
+    # Run nginx
+    systemctl enable --now nginx
+    
     ngnix_installed=True
 }
 
@@ -98,9 +112,9 @@ Help()
 	echo "-a          Make all options"
 	echo "-u          Allow to run site from user home folder"
 	echo "-v          Show version"
-	echo "-i          Install packages, alias to 'packages'"
-	echo "-p          Alias to 'prompt'"
-	echo "-b          Alias to 'backup'"
+	echo "-n          Install nginx and ngnix extra packages"
+#	echo "-p          Alias to 'prompt'"
+	#echo "-b          Alias to 'backup'"
 	echo
 }
 
