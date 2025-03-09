@@ -333,7 +333,7 @@ Help(){
 	echo "Install and basic Nginx settings"
 	echo "Without any parrameters will make all options"
 	echo
-	echo "Syntax: after-party.sh [-h|a|u|v|i|p|b]"
+	echo "Syntax: rhel_nginx_setup.sh [-h|a|u|v|n|d|b|c]"
 	echo "options:"
 	echo "-h          Print this help"
 	echo "-a          Make all options"
