@@ -317,9 +317,9 @@ EOF
 Help(){
 	# Display Help
 	echo "
- 	Install and basic Nginx settings on Red Hat linux distibutive.
-  	Must be root/sudo to run this script.
-	Without any parrameters will make all options.
+Install and basic Nginx settings on Red Hat linux distibutive.
+Must be root/sudo to run this script.
+Without any parrameters will make all options.
 	
 	Syntax: rhel_nginx_setup.sh [-h|a|u|v|n|d|b|c]
 	options:
@@ -343,7 +343,6 @@ Help(){
 Version(){
     echo "$script_name version: $script_version"
 }
-script_name
 
 ############################################################################
 # Main
