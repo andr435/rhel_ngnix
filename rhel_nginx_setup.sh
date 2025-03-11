@@ -12,7 +12,15 @@ set -o pipefail
 set -o nounset
 ################################################
 
+script_version=1.0.0
+script_name=rhel_nginx_setup.sh
+update_run=False
+ngnix_installed=False
+user_folder_run=False
+basic_auth_run=False
+cgi_run=False
 
+. /etc/os-release
 #############################################################################
 # Update_system
 #############################################################################
@@ -31,36 +39,14 @@ Update_system()
 }
 
 
-
-#############################################################################
-# Init
-#############################################################################
-Init()
-{
-	# Script initalization
-	# Check if the script is run with sudo
-	if (( "$EUID" > 0 )); then
-  		echo "Please run this script with  sudo."
-		Destruct
-  		exit 1
-	fi
-
-    version=1.0.0
-    update_run=False
-    ngnix_installed=False
-    user_folder_run=False
-    basic_auth_run=False
-    cgi_run=False
-}
-
-
 #############################################################################
 # Destruct
 #############################################################################
 Destruct()
 {
-	# Destruct, delete local variables
-	unset version
+    # Destruct, delete local variables
+    unset script_version
+    unset script_name
     unset update_run
     unset ngnix_installed
     unset user_folder_run
@@ -330,21 +316,24 @@ EOF
 ################################################################################
 Help(){
 	# Display Help
-	echo "Install and basic Nginx settings"
-	echo "Without any parrameters will make all options"
-	echo
-	echo "Syntax: rhel_nginx_setup.sh [-h|a|u|v|n|d|b|c]"
-	echo "options:"
-	echo "-h          Print this help"
-	echo "-a          Make all options"
-	echo "-u          Allow to run site from user home folder"
-	echo "-v          Show version"
-	echo "-n          Install nginx and ngnix extra packages"
-	echo "-d          Create virtual host for domain"
-	echo "-b          Test basic authentication"
-    echo "-c          CGI test"
-	echo
-}
+	echo "
+ 	Install and basic Nginx settings on Red Hat linux distibutive.
+  	Must be root/sudo to run this script.
+	Without any parrameters will make all options.
+	
+	Syntax: rhel_nginx_setup.sh [-h|a|u|v|n|d|b|c]
+	options:
+	-h          Print this help
+	-a          Make all options
+	-u          Allow to run site from user home folder
+	-v          Show version
+	-n          Install nginx and ngnix extra packages
+	-d          Create virtual host for domain
+	-b          Test basic authentication
+    	-c          CGI test
+
+ 	"
+ }
 
 
 
@@ -352,15 +341,23 @@ Help(){
 # Version
 ############################################################################
 Version(){
-    echo rhel_nginx_setup.sh version: $version
+    echo "$script_name version: $script_version"
 }
-
+script_name
 
 ############################################################################
 # Main
 ############################################################################
 Main(){
-	if [[ "$1" == "" ]]; then
+
+   # Check if the script is run with sudo
+   if (( "$EUID" > 0 )); then
+	echo "Please run this script with  sudo."
+	Destruct
+	exit 1
+   fi
+
+   if [[ "$1" == "" ]]; then
         Run_all
         exit 0
     fi
@@ -413,7 +410,6 @@ Main(){
 	
 }
 
-Init
 Main "$@"
 Destruct
 exit 0
