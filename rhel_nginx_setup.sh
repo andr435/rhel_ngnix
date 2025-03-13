@@ -12,7 +12,7 @@ set -o pipefail
 set -o nounset
 ################################################
 
-script_version=1.0.0
+script_version=1.0.1
 script_name=rhel_nginx_setup.sh
 update_run=False
 ngnix_installed=False
@@ -32,8 +32,8 @@ host_template="
 server {
     listen       80;
     listen       [::]:80;
-    server_name  $v_domain www.$v_domain;
-    root         /usr/share/nginx/$v_domain/html;
+    server_name  <DOMAIN> www.<DOMAIN>;
+    root         /usr/share/nginx/<DOMAIN>/html;
 
     access_log  /var/log/nginx/www_access.log;
     error_log   /var/log/nginx/www_error.log;
@@ -43,14 +43,11 @@ server {
             index  index.html index.htm;
     }
 
-    $v_add_dat
+    <ADDITIONAL_DATA>
 }
 "
 . /etc/os-release
 
-#############################################################################
-# Update_system
-#############################################################################
 Update_system()
 {
 	if [[ $update_run == True ]]; then
@@ -69,9 +66,6 @@ Update_system()
 }
 
 
-#############################################################################
-# Destruct
-#############################################################################
 Destruct()
 {
     # Destruct, delete variables
@@ -89,9 +83,6 @@ Destruct()
 }
 
 
-#############################################################################
-# Run_all
-#############################################################################
 Run_all(){
     Install_nginx
     User_folder
@@ -103,9 +94,6 @@ Run_all(){
 }
 
 
-#############################################################################
-# Install_nginx
-#############################################################################
 Install_nginx(){
     if [[ $ngnix_installed == True ]]; then
 		return 0
@@ -134,16 +122,13 @@ Install_nginx(){
 }
 
 
-#############################################################################
-# Domain_vhost
-#############################################################################
 Domain_vhost(){
     echo "Create Vrtual Host for domain"
-    read -p -r "Username of domain manager? " user_domain
+    read -p "Username of domain manager? " user_domain
     local stop_loop='no'
     until [[ "${stop_loop,,}" == 'yes' || "${stop_loop,,}" == 'y' ]]
     do
-        read -p -r  "Enter domain name: " domain
+        read -p  "Enter domain name: " domain
         if [[ -z "$domain" ]]; then # empty -> quite
             stop_loop='y'
         else
@@ -157,42 +142,44 @@ Domain_vhost(){
 }
 
 
-#############################################################################
-# Create_vhost
-#############################################################################
 Create_vhost(){ # $1=domain  $2=user $3=additional data
 
-    # check if site content folder exists
-    if [[ ! -d  "/usr/share/nginx/$1/html" ]]; then
-        mkdir -p /usr/share/nginx/"$1"/html
-        echo "<html>Welcome!!!</html>" > /usr/share/nginx/"$1"/html/index.html
-        chown -R "$2":nginx /usr/share/nginx/"$1"/html
-        chmod -R 755 /usr/share/nginx
-    fi
+    Create_vhost_folder $1 $2    
 
     # check if config file exist
-    if [[ ! -f "/etc/nginx/conf.d/$1.conf" ]]; then
+    if [[ ! -f "/etc/nginx/conf.d/${1}.conf" ]]; then
         local v_domain=$1
         local v_add_dat=$3
-        $host_template > "/etc/nginx/conf.d/$1.conf"
+        touch /etc/nginx/conf.d/${1}.conf
+        $host_template > /etc/nginx/conf.d/${1}.conf
 
         # CHANGE FOR REAL IP FOR NOT LOCAL SITES !!!!!!!!!!!!!
         Update_hosts "127.0.0.1" "$1"
         
-        Update_ssl "$1" "admin@$1"
+        Update_ssl "$1" "admin@${1}"
 
         # restart nginx
         systemctl restart nginx
     fi
 
-    echo "site located at: /usr/share/nginx/$1/html"
+    echo "site located at: /usr/share/nginx/${1}/html"
 }
 
 
-###############################################################################
-# Update_hosts
-###############################################################################
-Update_hosts(){ # $1 ip $2 domain
+Create_vhost_folder(){ # $1=domain $2=user
+    # check if site content folder exists
+    if [[ ! -d  "/usr/share/nginx/${1}/html" ]]; then
+        mkdir -p /usr/share/nginx/"${1}"/html
+        echo "<html>Welcome!!!</html>" > /usr/share/nginx/"${1}"/html/index.html
+        chown -R "${2}":nginx /usr/share/nginx/"${1}"/html
+        chmod -R 755 /usr/share/nginx
+    fi
+
+    return 0
+}
+
+
+Update_hosts(){ # $1=ip $2=domain
     echo "Update host file"
 
     echo "$1   $2" >> /etc/hosts
@@ -202,19 +189,16 @@ Update_hosts(){ # $1 ip $2 domain
 }
 
 
-###############################################################################
-# Update_ssl
-###############################################################################
-Update_ssl(){ # $1 domain $2 admin email
+Update_ssl(){ # $1=domain $2=admin email
     echo "Adding ssl."
     echo "skipping for localhost domains"
     #certbot --nginx -d $1 -m $2 --agree-tos
     #certbot renew --dry-run
+
+    return 0
 }
 
-################################################################################
-# User_folder                                                          
-################################################################################
+
 User_folder(){
 
     if [[ $user_folder_run == True ]]; then
@@ -224,7 +208,7 @@ User_folder(){
     # check if config file exist
     if [[ ! -f "/etc/nginx/conf.d/userdir.conf" ]]; then
         # get domain from where user domain will accasable
-        read -p -r "Enter domain for user directory: " v_domain
+        read -p "Enter domain for user directory: " v_domain
         
         if [[ -z $v_domain ]]; then # empty -> do nothing
             return 1
@@ -234,12 +218,34 @@ User_folder(){
             alias /home/\$1/public_html\$2;
             index  index.html index.htm;
         }"
+        touch /etc/nginx/conf.d/userdir.conf
+        local host_temp=$host_template
+        host_temp="${host_temp//<DOMAIN>/$v_domain}"
+        host_temp="${host_temp//<ADDITIONAL_DATA>/$v_add_dat}"
+        echo "${host_temp}" > /etc/nginx/conf.d/userdir.conf
 
-        $host_template > "/etc/nginx/conf.d/userdir.conf"
+        # Loop through all directories in /home
+        for dir in /home/*; do
+            # Check if it's a directory
+            if [[ -d "$dir" ]]; then
+                user_home="${dir}/public_html"  # Target folder inside each user's home
+                
+                # Create public_html folder if it doesn't exist
+                if [[ ! -d "$user_home" ]]; then
+                    mkdir "$user_home"
+                    echo "<html>Welcome!!!</html>" > "${user_home}/index.html"
+                    chmod 755 "$user_home"  # Set correct permissions
+                    chown -R "$(basename "$dir")":"nginx" "$user_home"
+                    echo "Created $user_home"
+                else
+                    echo "$user_home already exists"
+                fi
+            fi
+        done
 
         chmod 711 /home/*
-        chgrp -R nginx /home/*/public_html
-        chmod 755 -R /home/*/public_html
+        
+        Create_vhost_folder $v_domain root
 
         # CHANGE FOR REAL IP FOR NOT LOCAL SITES !!!!!!!!!!!!!
         Update_hosts "127.0.0.1" "$v_domain"
@@ -255,12 +261,11 @@ User_folder(){
     echo "site located at: /home/<user>/public_html/"
 
     user_folder_run=True
+
+    return 0
 }
 
 
-################################################################################
-# Basic_auth                                                         
-################################################################################
 Basic_auth(){
 
     if [[ $basic_auth_run == True ]]; then
@@ -271,7 +276,7 @@ Basic_auth(){
     if [[ ! -f "/etc/nginx/conf.d/basicauth.conf" ]]; then
 
          # get domain from where user domain will accasable
-        read -p -r "Enter domain for user directory: " v_domain
+        read -p "Enter domain for user directory: " v_domain
         
         if [[ -z $v_domain ]]; then # empty -> do nothing
             return 1
@@ -281,15 +286,15 @@ Basic_auth(){
             auth_basic            \"Basic Auth\";
             auth_basic_user_file  \"/etc/nginx/.htpasswd\";
         }"
-        
-        $host_template > "/etc/nginx/conf.d/basicauth.conf"
+        touch /etc/nginx/conf.d/basicauth.conf
+        $host_template > /etc/nginx/conf.d/basicauth.conf
        
         # check if site content folder exists
-        if [[ ! -d  "/usr/share/nginx/$v_domain/html/basicauth" ]]; then
-            mkdir -p /usr/share/nginx/"v_domain"/html/basicauth
-            echo "<html>basic auth!!!</html>" > /usr/share/nginx/"$v_domain"/html/basicauth/index.html
-            chgrp -R nginx /usr/share/nginx/"$v_domain"
-            chmod -R 755 /usr/share/nginx/"$v_domain"
+        if [[ ! -d  "/usr/share/nginx/${v_domain}/html/basicauth" ]]; then
+            mkdir -p /usr/share/nginx/"${v_domain}"/html/basicauth
+            echo "<html>basic auth!!!</html>" > /usr/share/nginx/"${v_domain}"/html/basicauth/index.html
+            chgrp -R nginx /usr/share/nginx/"${v_domain}"
+            chmod -R 755 /usr/share/nginx/"${v_domain}"
         fi
 
         htpasswd -c -b /etc/nginx/.htpasswd test test
@@ -299,16 +304,12 @@ Basic_auth(){
         unset v_domain
     fi
 
-    echo "site located at: http://$v_domain/basicauth user/pwd: test/test"
+    echo "site located at: http://${v_domain}/basicauth user/pwd: test/test"
 
     basic_auth_run=True
 }
 
 
-
-################################################################################
-# Fast_cgi                                                         
-################################################################################
 Fast_cgi(){
 
     if [[ $cgi_run == True ]]; then
@@ -357,9 +358,7 @@ Fast_cgi(){
     cgi_run=True
 }
 
-################################################################################
-# Help                                                                         
-################################################################################
+
 Help(){
 	# Display Help
 	echo "
@@ -379,23 +378,17 @@ DESCRIPTION
 	-n          Install nginx and ngnix extra packages
 	-d          Create virtual host for domain
 	-b          Test basic authentication
-    -c          CGI test
+	-c          CGI test
 
  	"
  }
 
 
-
-############################################################################
-# Version
-############################################################################
 Version(){
     echo "$script_name version: $script_version"
 }
 
-############################################################################
-# Main
-############################################################################
+
 Main(){
 
    # Check if the script is run with sudo
