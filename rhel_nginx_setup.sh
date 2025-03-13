@@ -287,11 +287,15 @@ Basic_auth(){
             auth_basic_user_file  \"/etc/nginx/.htpasswd\";
         }"
         touch /etc/nginx/conf.d/basicauth.conf
-        $host_template > /etc/nginx/conf.d/basicauth.conf
-       
+        local host_temp=$host_template
+        host_temp="${host_temp//<DOMAIN>/$v_domain}"
+        host_temp="${host_temp//<ADDITIONAL_DATA>/$v_add_dat}"
+        echo "${host_temp}" > /etc/nginx/conf.d/basicauth.conf
+
         # check if site content folder exists
         if [[ ! -d  "/usr/share/nginx/${v_domain}/html/basicauth" ]]; then
             mkdir -p /usr/share/nginx/"${v_domain}"/html/basicauth
+            echo "<html>Welcome!!</html>" > /usr/share/nginx/"${v_domain}"/html/index.html
             echo "<html>basic auth!!!</html>" > /usr/share/nginx/"${v_domain}"/html/basicauth/index.html
             chgrp -R nginx /usr/share/nginx/"${v_domain}"
             chmod -R 755 /usr/share/nginx/"${v_domain}"
@@ -307,6 +311,8 @@ Basic_auth(){
     echo "site located at: http://${v_domain}/basicauth user/pwd: test/test"
 
     basic_auth_run=True
+
+    return 0
 }
 
 
@@ -320,7 +326,7 @@ Fast_cgi(){
     if [[ ! -f "/etc/nginx/conf.d/basicauth.conf" ]]; then
 
          # get domain from where user domain will accasable
-        read -p -r "Enter domain for user directory: " v_domain
+        read -p "Enter domain for user directory: " v_domain
         
         if [[ -z $v_domain ]]; then # empty -> do nothing
             return 1
@@ -334,7 +340,10 @@ Fast_cgi(){
             include /etc/nginx/fastcgi_params;
             fastcgi_param SCRIPT_FILENAME  \$document_root\$fastcgi_script_name;
         }"
-        $host_template > "/etc/nginx/conf.d/cgi.conf"
+        local host_temp=$host_template
+        host_temp="${host_temp//<DOMAIN>/$v_domain}"
+        host_temp="${host_temp//<ADDITIONAL_DATA>/$v_add_dat}"
+        echo "${host_temp}" > /etc/nginx/conf.d/cgi.conf
         
         # check if site content folder exists
         if [[ ! -d  "/usr/share/nginx/$v_domain/html/cgi-bin" ]]; then
@@ -343,11 +352,12 @@ Fast_cgi(){
         
         pgrep -x fcgiwrap > /dev/null || spawn-fcgi -s /run/fcgiwrap.socket -M 777 -- /usr/sbin/fcgiwrap &
         
-        $cgi_file > "/usr/share/nginx/$v_domain/html/cgi-bin/index.cgi"
+        $cgi_file > "/usr/share/nginx/${v_domain}/html/cgi-bin/index.cgi"
+        echo "<html>Welcome!!</html>" > /usr/share/nginx/"${v_domain}"/html/index.html
 
-        chmod 755 /usr/share/nginx/"$v_domain"/html/cgi-bin
+        chmod 755 -R /usr/share/nginx/"$v_domain"/
         chgrp -R nginx /usr/share/nginx/"$v_domain"
-        chmod 755 /usr/share/nginx/"$v_domain"/html/cgi-bin/index.cgi
+
         systemctl restart nginx    
         unset v_domain
     fi
@@ -356,6 +366,8 @@ Fast_cgi(){
     echo "site located at: http://$v_domain/cgi-bin"
 
     cgi_run=True
+
+    return 0
 }
 
 
